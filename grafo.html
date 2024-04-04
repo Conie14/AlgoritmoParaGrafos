@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crea un grafo y agrega un algoritmo</title>
+    <style>
+        #canvasContainer {
+            margin: 20px auto;
+            text-align: center;
+        }
+
+        canvas {
+            border: 1px solid black;
+            
+
+        }
+    </style>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <!-- SweetAlert2 CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+</head>
+
+<body>
+    <h2 class="text-center mt-3 mb-4">Buscador de Caminos Más Cortos</h2>
+
+    <div id="canvasContainer" >
+        <canvas id="canvas"  width="800px" height="500px"></canvas>
+    </div>
+    <!-- <p class="text-center">Crea un grafo y agrega un algoritmo</p> -->
+ <div class="container-fluid">
+    <div class="row">
+        <div class="col text-center mb-4">
+            <button class="btn btn-success mr-4" onclick="agregarNodo()"><i class="fas fa-plus"></i> Agregar Nodo</button>
+            <button class="btn btn-primary mr-4" onclick="iniciarAgregarArista()"><i class="fas fa-link"></i> Agregar Arista</button>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col text-center mb-4">
+            <button class="btn btn-outline-primary mr-2" onclick="bfs()"><i class="fas fa-search"></i> BFS</button>
+            <button class="btn btn-outline-secondary mr-2" onclick="dfs()"><i class="fas fa-search"></i> DFS</button>
+            <button class="btn btn-outline-success mr-2" onclick="prim()"><i class="fas fa-search"></i> Prim</button>
+            <button class="btn btn-outline-danger mr-2" onclick="kruskal()"><i class="fas fa-search"></i> Kruskal</button>
+            <button class="btn btn-outline-warning mr-2" onclick="dijkstra()"><i class="fas fa-search"></i> Dijkstra</button>
+            <button class="btn btn-outline-info mr-2" onclick="bellmanFord()"><i class="fas fa-search"></i> Bellman-Ford</button>
+            <button class="btn btn-outline-dark mr-2" onclick="boruvka()"><i class="fas fa-search"></i> Boruvka</button>
+            <button class="btn btn-outline-primary mr-2" onclick="reverseBoruvka()"><i class="fas fa-search"></i> Reverse Boruvka</button>
+            <button class="btn btn-outline-secondary mr-2" onclick="algoritmoDeColoreo()"><i class="fas fa-search"></i> Algoritmo de coloreo</button>
+            <button class="btn btn-outline-success mr-2" onclick="encontrarCaminoMasCorto()"><i class="fas fa-search"></i> Encontrar Camino Más Corto</button>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col text-center mb-4">
+            <button class="btn btn-outline-danger btn-lg" onclick="descargarGrafoComoTXT()"><i class="fas fa-download"></i> Descargar Grafo</button>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col text-center mb-4">
+            <input type="file" id="inputArchivo" accept=".txt">
+            <button class="btn btn-warning" onclick="cargarGrafoDesdeArchivo()"><i class="fas fa-upload"></i> Cargar Grafo</button>
+        </div>
+    </div>
+</div>
+
+
+    <script>
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var vertices = [];
+        var aristas = [];
+        var nodoSeleccionado = null;
+        var agregandoArista = false; // Bandera para controlar si se está agregando una arista
+        var agregandoNodo = false; // Bandera para controlar
+        var grafoCargado = false; // Variable global para indicar si el grafo ha sido cargado
+
+        function dibujarNodo(x, y, etiqueta, colorTransparente = false) {
+            ctx.beginPath();
+            ctx.arc(x, y, 20, 0, 2 * Math.PI);
+            if (!colorTransparente) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0)'; // Color transparente al principio
+            } else {
+                ctx.fillStyle = colorTransparente; // Cambiar a otro color si se proporciona
+            }
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = 'black'; // Restaurar el color de relleno a negro para el texto
+            ctx.fillText(etiqueta, x - 5, y + 5);
+        }
+
+        function dibujarArista(inicio, fin, peso) {
+            ctx.beginPath();
+            ctx.moveTo(vertices[inicio].x, vertices[inicio].y);
+            ctx.lineTo(vertices[fin].x, vertices[fin].y);
+            ctx.stroke();
+            ctx.fillText(peso, (vertices[inicio].x + vertices[fin].x) / 2, (vertices[inicio].y + vertices[fin].y) / 2);
+        }
+
+        function agregarVertice(evento) {
+            if (!agregandoArista) {
+                var rect = canvas.getBoundingClientRect();
+                var x = evento.clientX - rect.left;
+                var y = evento.clientY - rect.top;
+                var etiqueta = String.fromCharCode(65 + vertices.length);
+                dibujarNodo(x, y, etiqueta);
+                vertices.push({ x: x, y: y, etiqueta: etiqueta });
+            }
+            
+        }
+
+        function agregarNodo() {
+            agregandoNodo = true;
+            if (!agregandoArista) {
+                canvas.addEventListener("click", agregarVertice);
+            } else {
+                canvas.removeEventListener("click", agregarVertice); // Eliminamos el listener de clics mientras se agrega una arista
+            }
+            
+        }
+
+        function iniciarAgregarArista() {
+            nodoSeleccionado = null;
+            agregandoArista = true;
+            agregandoNodo = false;
+            //alert("Haz clic en el primer nodo.");
+            swal.fire({
+                title: 'Agregar Arista',
+                text: 'Haz clic en el primer nodo.',
+                icon: 'info'
+            });
+           
+        }
+
+        function agregarArista(nodoInicio, nodoFin) {
+
+            if (agregandoArista) { 
+                swal.fire({
+                    title: 'Agregar Arista',
+                    input: 'text',
+                    inputLabel: 'Ingresa el peso de la arista:',
+                    showCancelButton: true
+                }).then((resultado) => {
+                    if (resultado.isConfirmed) {
+                        var peso = resultado.value;
+                        if (!isNaN(peso)) {
+                            dibujarArista(nodoInicio, nodoFin, peso);
+                            aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: parseFloat(peso) });
+                        }
+                    }
+                });
+            }
+            
+        }
+
+        function bfs() {
+            if(grafoCargado == false){
+                swal.fire({
+                    title: 'Recorrido BFS',
+                    input: 'text',
+                    inputLabel: 'Ingresa el vértice de inicio (A, B, C, ...)',
+                    showCancelButton: true
+                }).then((resultado) => {
+
+                    if (resultado.isConfirmed) {
+                        var inicio = resultado.value;
+                        var indiceInicio = inicio.charCodeAt(0) - 65; 
+
+                        var visitados = new Array(vertices.length).fill(false);
+                        var cola = [];
+                        var recorrido = [];
+
+                        cola.push(indiceInicio);
+                        visitados[indiceInicio] = true;
+
+                        while (cola.length > 0) {
+                            var nodoActual = cola.shift();
+                            recorrido.push(nodoActual);
+
+                            for (var i = 0; i < aristas.length; i++) {
+                                if (aristas[i].inicio === nodoActual && !visitados[aristas[i].fin]) {
+                                    cola.push(aristas[i].fin);
+                                    visitados[aristas[i].fin] = true;
+                                }
+                            }
+                        }
+
+                        var recorridoStr = recorrido.map(indice => vertices[indice].etiqueta).join(" -> ");
+                        swal.fire({
+                            title: 'Recorrido BFS',
+                            text: 'Recorrido BFS: ' + recorridoStr,
+                            icon: 'info'
+                        });
+                    }
+                });
+            }
+            if (grafoCargado == true) {
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+
+
+        }
+
+        function dfs() {
+            if(grafoCargado == false){
+                swal.fire({
+                    title: 'Recorrido DFS',
+                    input: 'text',
+                    inputLabel: 'Ingresa el vértice de inicio (A, B, C, ...)',
+                    showCancelButton: true
+                }).then((resultado) => {
+                    if (resultado.isConfirmed) {
+                        var inicio = resultado.value;
+                        var indiceInicio = inicio.charCodeAt(0) - 65; 
+
+                        var visitados = new Array(vertices.length).fill(false);
+                        var recorrido = [];
+
+                        function dfsRecursivo(nodo) {
+                            visitados[nodo] = true;
+                            recorrido.push(nodo);
+
+                            for (var i = 0; i < aristas.length; i++) {
+                                if (aristas[i].inicio === nodo && !visitados[aristas[i].fin]) {
+                                    dfsRecursivo(aristas[i].fin);
+                                }
+                            }
+                        }
+
+                        dfsRecursivo(indiceInicio);
+
+                        var recorridoStr = recorrido.map(indice => vertices[indice].etiqueta).join(" -> ");
+                        swal.fire({
+                            title: 'Recorrido DFS',
+                            text: 'Recorrido DFS: ' + recorridoStr,
+                            icon: 'info'
+                        });
+                    }
+                });
+            }
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+
+        }
+
+        function prim() {
+            if(grafoCargado ==false){
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+                swal.fire({
+                    title: 'Prim en el Grafo',
+                    input: 'text',
+                    inputLabel: 'Ingresa el vértice de inicio (A, B, C, ...)',
+                    showCancelButton: true
+                }).then((resultado) =>{
+                    if(resultado.isConfirmed){
+                        var verticeInicio = resultado.value;
+                        var inicio = verticeInicio.charCodeAt(0) - 65; 
+
+                        var mst = [];
+                        var visitados = new Array(vertices.length).fill(false);
+                        visitados[inicio] = true;
+
+                        var valorTotal = 0;
+
+                        while (mst.length < vertices.length - 1) {
+                            var minPeso = Infinity;
+                            var minArista = null;
+
+                            for (var i = 0; i < aristas.length; i++) {
+                                var arista = aristas[i];
+                                if ((visitados[arista.inicio] && !visitados[arista.fin]) || (visitados[arista.fin] && !visitados[arista.inicio])) {
+                                    if (arista.peso < minPeso) {
+                                        minPeso = arista.peso;
+                                        minArista = arista;
+                                    }
+                                }
+                            }
+
+                            if (minArista) {
+                                mst.push(minArista);
+                                visitados[minArista.inicio] = true;
+                                visitados[minArista.fin] = true;
+                                valorTotal += minArista.peso; 
+                            } else {
+                                break; 
+                            }
+                        }
+
+                        var mstStr = mst.map(arista => vertices[arista.inicio].etiqueta + "-" + vertices[arista.fin].etiqueta + ": " + arista.peso).join(", ");
+                        var alertMsg = "Árbol de Expansión Mínima (Prim): " + mstStr + "\n Valor Total: " + valorTotal;
+                        swal.fire({
+                            title: 'Árbol de Expansión Mínima (Prim)',
+                            text: alertMsg,
+                            icon: 'info'
+                        });
+                    }
+
+                })
+            }
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+
+        }
+
+        function kruskal() {
+            if(grafoCargado == false){
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                function find(conjuntos, nodo) {
+                    while (conjuntos[nodo] !== nodo) {
+                        nodo = conjuntos[nodo];
+                    }
+                    return nodo;
+                }
+
+                function union(conjuntos, nodoA, nodoB) {
+                    var raizA = find(conjuntos, nodoA);
+                    var raizB = find(conjuntos, nodoB);
+                    conjuntos[raizA] = raizB;
+                }
+
+                aristas.sort((a, b) => a.peso - b.peso);
+
+                var conjuntos = [];
+                for (var i = 0; i < vertices.length; i++) {
+                    conjuntos[i] = i; 
+                }
+
+                var mst = [];
+                var valorTotal = 0;
+
+                // Iterar sobre las aristas ordenadas
+                for (var i = 0; i < aristas.length; i++) {
+                    var arista = aristas[i];
+                    var raizInicio = find(conjuntos, arista.inicio);
+                    var raizFin = find(conjuntos, arista.fin);
+
+                    if (raizInicio !== raizFin) {
+                        mst.push(arista);
+                        union(conjuntos, arista.inicio, arista.fin);
+                        valorTotal += arista.peso;
+                    }
+                }
+
+                var mstStr = mst.map(arista => vertices[arista.inicio].etiqueta + "-" + vertices[arista.fin].etiqueta + ": " + arista.peso).join(", ");
+                var alertMsg = "Árbol de Expansión Mínima (Kruskal): " + mstStr + "\n Valor Total: " + valorTotal;
+                swal.fire({
+                    title: 'Árbol de Expansión Mínima (Kruskal)',
+                    text: alertMsg,
+                    icon: 'info'
+                });
+            }
+
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+            
+        }
+
+        function dijkstra() {
+            if(grafoCargado ==false){
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+                var distancias = new Array(vertices.length).fill(Infinity);
+                swal.fire({
+                    title: 'Dijkstra en el Grafo',
+                    input: 'text',
+                    inputLabel: 'Ingresa el vértice de inicio (A, B, C, ...)',
+                    showCancelButton: true
+                }).then((resultado) => {
+                    if (resultado.isConfirmed) {
+                        var nodoInicio = resultado.value;
+                        swal.fire({
+                            title: 'Dijkstra en el Grafo',
+                            input: 'text',
+                            inputLabel: 'Ingresa el vértice de final (A, B, C, ...)',
+                            showCancelButton: true
+                        }).then((resultado) => {
+                            if (resultado.isConfirmed) {
+                                var nodoFinal = resultado.value;
+                                var inicio = nodoInicio.charCodeAt(0) - 65; 
+                                var fin = nodoFinal.charCodeAt(0) - 65; 
+                                distancias[inicio] = 0;
+
+                                var visitados = new Array(vertices.length).fill(false);
+
+                                // Iteramos hasta que todos los nodos hayan sido visitados
+                                for (var i = 0; i < vertices.length; i++) {
+                                    // Encontramos el nodo no visitado con la distancia mínima
+                                    var nodoActual = encontrarNodoMinimo(distancias, visitados);
+
+                                    // Marcamos el nodo actual como visitado
+                                    visitados[nodoActual] = true;
+
+                                    // Si el nodo actual es el nodo final, terminamos el algoritmo
+                                    if (nodoActual === fin) {
+                                        break;
+                                    }
+
+                                    // Actualizamos las distancias de los nodos adyacentes al nodo actual
+                                    for (var j = 0; j < aristas.length; j++) {
+                                        var arista = aristas[j];
+                                        if (arista.inicio === nodoActual && !visitados[arista.fin]) {
+                                            var distanciaHastaVecino = distancias[nodoActual] + arista.peso;
+                                            if (distanciaHastaVecino < distancias[arista.fin]) {
+                                                distancias[arista.fin] = distanciaHastaVecino;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Mostramos la distancia mínima desde el nodo de inicio hasta el nodo final
+                                var distanciaMinima = distancias[fin] === Infinity ? "No alcanzable" : distancias[fin];
+                                swal.fire({
+                                    title: 'Dijkstra en el Grafo',
+                                    text: 'Distancia mínima desde el nodo ' + nodoInicio + ' hasta el nodo ' + nodoFinal + ': ' + distanciaMinima,
+                                    icon: 'info'
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+         
+        }
+
+        function encontrarNodoMinimo(distancias, visitados) {
+            var minDistancia = Infinity;
+            var nodoMinimo = -1;
+
+            for (var i = 0; i < distancias.length; i++) {
+                if (!visitados[i] && distancias[i] <= minDistancia) {
+                    minDistancia = distancias[i];
+                    nodoMinimo = i;
+                }
+            }
+
+            return nodoMinimo;
+        }
+
+        function bellmanFord() {
+            if(grafoCargado == false){
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+                var distancias = new Array(vertices.length).fill(Infinity);
+                swal.fire({
+                    title: 'Bellman-Ford en el Grafo',
+                    input: 'text',
+                    inputLabel: 'Ingresa el vértice de inicio (A, B, C, ...)',
+                    showCancelButton: true
+                }).then((resultado) => {
+                    if (resultado.isConfirmed) {
+                        var nodoInicio = resultado.value;
+                        swal.fire({
+                            title: 'Bellman-Ford en el Grafo',
+                            input: 'text',
+                            inputLabel: 'Ingresa el vértice de final (A, B, C, ...)',
+                            showCancelButton: true
+                        }).then((resultado) => {
+                            if (resultado.isConfirmed) {
+                                var nodoFinal = resultado.value;
+                                var inicio = nodoInicio.charCodeAt(0) - 65;
+                                var fin = nodoFinal.charCodeAt(0) - 65;
+                                distancias[inicio] = 0;
+
+                                // Iteramos V-1 veces, donde V es el número de vértices
+                                for (var i = 0; i < vertices.length - 1; i++) {
+                                    // Iteramos sobre todas las aristas y actualizamos las distancias
+                                    for (var j = 0; j < aristas.length; j++) {
+                                        var arista = aristas[j];
+                                        var u = arista.inicio;
+                                        var v = arista.fin;
+                                        var peso = arista.peso;
+                                        if (distancias[u] !== Infinity && distancias[u] + peso < distancias[v]) {
+                                            distancias[v] = distancias[u] + peso;
+                                        }
+                                    }
+                                }
+
+                                // Verificamos si hay ciclos de peso negativo
+                                for (var k = 0; k < aristas.length; k++) {
+                                    var u = aristas[k].inicio;
+                                    var v = aristas[k].fin;
+                                    var peso = aristas[k].peso;
+                                    if (distancias[u] !== Infinity && distancias[u] + peso < distancias[v]) {
+                                        //alert("El grafo contiene un ciclo de peso negativo.");
+                                        swal.fire({
+                                            title: 'Bellman-Ford en el Grafo',
+                                            text: 'El grafo contiene un ciclo de peso negativo.',
+                                            icon: 'info'
+                                        });
+                                        return;
+                                    }
+                                }
+
+                                // Mostramos la distancia mínima desde el nodo de inicio hasta el nodo final
+                                var distanciaMinima = distancias[fin] === Infinity ? "No alcanzable" : distancias[fin];
+                                //alert("Distancia mínima desde el nodo " + nodoInicio + " hasta el nodo " + nodoFinal + ": " + distanciaMinima);
+                                swal.fire({
+                                    title: 'Bellman-Ford en el Grafo',
+                                    text: 'Distancia mínima desde el nodo ' + nodoInicio + ' hasta el nodo ' + nodoFinal + ': ' + distanciaMinima,
+                                    icon: 'info'
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+     
+        }
+                    
+        function boruvka() {
+            if(grafoCargado == false){
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+                swal.fire({
+                    title: 'Boruvka en el Grafo',
+                    input: 'text',
+                    inputLabel: 'Ingresa el vértice de inicio (A, B, C, ...)',
+                    showCancelButton: true
+                }).then((resultado) => {
+
+                    if (resultado.isConfirmed) {
+                        var nodoInicio = resultado.value;
+                        swal.fire({
+                            title: 'Boruvka en el Grafo',
+                            input: 'text',
+                            inputLabel: 'Ingresa el vértice de final (A, B, C, ...)',
+                            showCancelButton: true
+                        }).then((resultado) => {
+                            if (resultado.isConfirmed) {
+                                var nodoFinal = resultado.value;
+                                var inicio = nodoInicio.charCodeAt(0) - 65;
+                                var fin = nodoFinal.charCodeAt(0) - 65;
+
+                                var conjuntos = [];
+                                for (var i = 0; i < vertices.length; i++) {
+                                    conjuntos[i] = i;
+                                }
+
+                                var mst = [];
+                                var valorTotal = 0;
+
+                                while (mst.length < vertices.length - 1) {
+                                    var aristasPorConjunto = [];
+                                    for (var i = 0; i < vertices.length; i++) {
+                                        aristasPorConjunto[i] = [];
+                                    }
+
+                                    for (var i = 0; i < aristas.length; i++) {
+                                        var arista = aristas[i];
+                                        var raizInicio = encontrarRaiz(conjuntos, arista.inicio);
+                                        var raizFin = encontrarRaiz(conjuntos, arista.fin);
+
+                                        if (raizInicio !== raizFin) {
+                                            aristasPorConjunto[raizInicio].push(arista);
+                                        }
+                                    }
+
+                                    for (var i = 0; i < vertices.length; i++) {
+                                        if (aristasPorConjunto[i].length > 0) {
+                                            var minPeso = Infinity;
+                                            var minArista = null;
+
+                                            for (var j = 0; j < aristasPorConjunto[i].length; j++) {
+                                                if (aristasPorConjunto[i][j].peso < minPeso) {
+                                                    minPeso = aristasPorConjunto[i][j].peso;
+                                                    minArista = aristasPorConjunto[i][j];
+                                                }
+                                            }
+
+                                            mst.push(minArista);
+                                            unirConjuntos(conjuntos, minArista.inicio, minArista.fin);
+                                            valorTotal += minArista.peso;
+                                        }
+                                    }
+                                }
+
+                                var mstStr = mst.map(arista => vertices[arista.inicio].etiqueta + "-" + vertices[arista.fin].etiqueta + ": " + arista.peso).join(", ");
+                                var alertMsg = "Árbol de Expansión Mínima (Boruvka): " + mstStr + "\nValor Total: " + valorTotal;
+                                swal.fire({
+                                    title: 'Árbol de Expansión Mínima (Boruvka)',
+                                    text: alertMsg,
+                                    icon: 'info'
+                                });
+
+                                function encontrarRaiz(conjuntos, nodo) {
+                                    while (conjuntos[nodo] !== nodo) {
+                                        nodo = conjuntos[nodo];
+                                    }
+                                    return nodo;
+                                }
+
+                                function unirConjuntos(conjuntos, nodoA, nodoB) {
+                                    var raizA = encontrarRaiz(conjuntos, nodoA);
+                                    var raizB = encontrarRaiz(conjuntos, nodoB);
+                                    conjuntos[raizA] = raizB;
+                                }
+
+
+                            }
+                        });
+                    }
+                });
+            }
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+     
+        }
+
+        function reverseBoruvka() {
+            if(grafoCargado == false){
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var conjuntos = [];
+                for (var i = 0; i < vertices.length; i++) {
+                    conjuntos[i] = i;
+                }
+
+                var mst = [];
+                var valorTotal = 0;
+
+                while (mst.length < vertices.length - 1) {
+                    var aristasPorConjunto = [];
+                    for (var i = 0; i < vertices.length; i++) {
+                        aristasPorConjunto[i] = [];
+                    }
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        var arista = aristas[i];
+                        var raizInicio = encontrarRaiz(conjuntos, arista.inicio);
+                        var raizFin = encontrarRaiz(conjuntos, arista.fin);
+
+                        if (raizInicio !== raizFin) {
+                            aristasPorConjunto[raizInicio].push(arista);
+                        }
+                    }
+
+                    for (var i = 0; i < vertices.length; i++) {
+                        if (aristasPorConjunto[i].length > 0) {
+                            var maxPeso = -Infinity;
+                            var maxArista = null;
+
+                            for (var j = 0; j < aristasPorConjunto[i].length; j++) {
+                                if (aristasPorConjunto[i][j].peso > maxPeso) {
+                                    maxPeso = aristasPorConjunto[i][j].peso;
+                                    maxArista = aristasPorConjunto[i][j];
+                                }
+                            }
+
+                            mst.push(maxArista);
+                            unirConjuntos(conjuntos, maxArista.inicio, maxArista.fin);
+                            valorTotal += maxArista.peso;
+                        }
+                    }
+                }
+
+                var mstStr = mst.map(arista => vertices[arista.inicio].etiqueta + "-" + vertices[arista.fin].etiqueta + ": " + arista.peso).join(", ");
+                var alertMsg = "Árbol de Expansión Mínima (Reverse Boruvka): " + mstStr + "\nValor Total: " + valorTotal;
+                swal.fire({
+                    title: 'Árbol de Expansión Mínima (Reverse Boruvka)',
+                    text: alertMsg,
+                    icon: 'info'
+                });
+
+                function encontrarRaiz(conjuntos, nodo) {
+                    while (conjuntos[nodo] !== nodo) {
+                        nodo = conjuntos[nodo];
+                    }
+                    return nodo;
+                }
+
+                function unirConjuntos(conjuntos, nodoA, nodoB) {
+                    var raizA = encontrarRaiz(conjuntos, nodoA);
+                    var raizB = encontrarRaiz(conjuntos, nodoB);
+                    conjuntos[raizA] = raizB;
+                }
+            }
+            
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+     
+        }
+
+        function algoritmoDeColoreo() {
+            if(grafoCargado == false){
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                // Inicializar un arreglo para almacenar los colores de los nodos
+                var colores = new Array(vertices.length).fill(-1);
+
+                // Función auxiliar para verificar si un nodo puede ser coloreado con cierto color
+                function esColorValido(nodo, color) {
+                    // Iterar sobre los nodos adyacentes y verificar si alguno tiene el mismo color
+                    for (var i = 0; i < aristas.length; i++) {
+                        var arista = aristas[i];
+                        if (arista.inicio === nodo && colores[arista.fin] === color) {
+                            return false;
+                        }
+                        if (arista.fin === nodo && colores[arista.inicio] === color) {
+                            return false;
+                        }
+                    }
+                    return true; // Si ningún nodo adyacente tiene el mismo color, el color es válido
+                }
+
+                // Función para encontrar el color mínimo disponible para un nodo
+                function encontrarColorMinimo(nodo) {
+                    // Inicializar el color mínimo como 0
+                    var color = 0;
+                    // Iterar sobre los colores de los nodos adyacentes y encontrar el siguiente color disponible
+                    for (var i = 0; i < vertices.length; i++) {
+                        if (i === nodo) continue; // Saltar el propio nodo
+                        if (aristas.some(arista => (arista.inicio === nodo && arista.fin === i) || (arista.fin === nodo && arista.inicio === i))) {
+                            if (colores[i] !== -1 && colores[i] >= color) {
+                                color = colores[i] + 1;
+                            }
+                        }
+                    }
+                    return color;
+                }
+
+                // Colorear cada nodo del grafo
+                for (var i = 0; i < vertices.length; i++) {
+                    // Encontrar el color mínimo disponible para el nodo actual
+                    var color = encontrarColorMinimo(i);
+                    // Asignar el color al nodo
+                    colores[i] = color;
+                }
+
+                // Construir un conjunto de colores únicos utilizados en el grafo
+                var conjuntoDeColores = new Set(colores);
+
+                // Mostrar el resultado del coloreo en una alerta
+                swal.fire({
+                    title: 'Algoritmo de Coloreo',
+                    text: 'El grafo ha sido coloreado correctamente.\nNúmero de colores utilizados: ' + conjuntoDeColores.size,
+                    icon: 'info'
+                });
+
+                // Redibujar los nodos con los colores asignados
+                for (var i = 0; i < vertices.length; i++) {
+                    var nodo = vertices[i];
+                    var colorAsignado = obtenerColor(colores[i]);
+                    dibujarNodo(nodo.x, nodo.y, nodo.etiqueta, colorAsignado);
+                }
+            }
+            
+            if(grafoCargado == true){
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+     
+        }
+
+        function obtenerColor(numero) {
+            var colores = ['red', 'green', 'blue', 'orange', 'purple', 'yellow', 'cyan', 'magenta', 'brown', 'lime'];
+            return colores[numero % colores.length];
+        }
+
+        function encontrarCaminoMasCorto(contenido) {
+            if (grafoCargado == false) {
+                if (vertices.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Debes agregar al menos un nodo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var distancias = new Array(vertices.length).fill(Infinity);
+                swal.fire({
+                    title: 'Encontrar Camino Más Corto',
+                    input: 'text',
+                    inputLabel: 'Ingresa el vértice de inicio (A, B, C, ...)',
+                    showCancelButton: true
+                }).then((resultado) => {
+                    if (resultado.isConfirmed) {
+                        var nodoInicio = resultado.value;
+                        swal.fire({
+                            title: 'Encontrar Camino Más Corto',
+                            input: 'text',
+                            inputLabel: 'Ingresa el vértice de final (A, B, C, ...)',
+                            showCancelButton: true
+                        }).then((resultado) => {
+                            if (resultado.isConfirmed) {
+                                var nodoFinal = resultado.value;
+                                var inicio = nodoInicio.charCodeAt(0) - 65;
+                                var fin = nodoFinal.charCodeAt(0) - 65;
+                                distancias[inicio] = 0;
+                                var visitados = new Array(vertices.length).fill(false);
+                                for (var i = 0; i < vertices.length; i++) {
+                                    var nodoActual = encontrarNodoMinimo(distancias, visitados);
+                                    visitados[nodoActual] = true;
+                                    if (nodoActual === fin) {
+                                        break;
+                                    }
+                                    for (var j = 0; j < aristas.length; j++) {
+                                        var arista = aristas[j];
+                                        if (arista.inicio === nodoActual && !visitados[arista.fin]) {
+                                            var distanciaHastaVecino = distancias[nodoActual] + arista.peso;
+                                            if (distanciaHastaVecino < distancias[arista.fin]) {
+                                                distancias[arista.fin] = distanciaHastaVecino;
+                                            }
+                                        }
+                                    }
+                                }
+                                var distanciaMinima = distancias[fin] === Infinity ? "No alcanzable" : distancias[fin];
+                                swal.fire({
+                                    title: 'Camino más corto',
+                                    text: 'Distancia mínima desde el nodo ' + nodoInicio + ' hasta el nodo ' + nodoFinal + ': ' + distanciaMinima,
+                                    icon: 'info'
+                                });
+                            }
+                        });
+                    }
+                });
+
+
+            } 
+            if (grafoCargado == true) {
+                var inputArchivo = document.getElementById('inputArchivo');
+                // Verificar si se ha seleccionado un archivo
+                if (inputArchivo.files.length === 0) {
+                    swal.fire({
+                        title: 'Error',
+                        text: 'Por favor, selecciona un archivo.',
+                        icon: 'error'
+                    });
+                    return;
+                }
+
+                var archivo = inputArchivo.files[0];
+                var lector = new FileReader();
+
+                lector.onload = function (evento) {
+                    var contenido = evento.target.result;
+
+                    //obten todos los nodos e imprímelos
+                    var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+                    var nodosFin = contenido.indexOf("Aristas:");
+                    var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+                    var nodos = [];
+                    nodosTexto.forEach(function (nodoTexto) {
+                        var partes = nodoTexto.split(":");
+                        var etiqueta = partes[0].trim();
+                        nodos.push(etiqueta);
+                    });
+
+                    //obtener todas las aristas y sus pesos e imprímelos
+                    var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+                    var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+                    var aristas = [];
+                    aristasTexto.forEach(function (aristaTexto) {
+                        var partes = aristaTexto.split(":");
+
+                        var nodosPartes = partes[0].trim().split("->");
+                        var nodoInicio = nodosPartes[0].trim();
+                        var nodoFin = nodosPartes[1].trim();
+
+                        var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                        aristas.push({ inicio: nodoInicio, fin: nodoFin, peso: peso });
+                    });
+
+                    arre = [];
+
+                    for (var i = 0; i < aristas.length; i++) {
+                        arre.push(aristas[i].inicio + "->" + aristas[i].fin + aristas[i].peso + "\n");
+                    }
+
+                    swal.fire({
+                        title: 'Grafo cargado correctamente',
+                        html: 'El grafo ha sido cargado correctamente y tiene los siguientes nodos:<br>' + nodos + '<br><br>' +
+                            'y las siguientes aristas:<br>' + arre,
+                        icon: 'success'
+                    });
+
+                };
+
+                lector.readAsText(archivo);
+            }
+        }
+
+        function descargarGrafoComoTXT() {
+            var contenido = "Nodos:\n";
+            vertices.forEach(function (vertice, indice) {
+                contenido += vertice.etiqueta + ": (" + vertice.x + ", " + vertice.y + ")\n";
+            });
+            contenido += "\nAristas:\n";
+            aristas.forEach(function (arista) {
+                contenido += vertices[arista.inicio].etiqueta + " -> " + vertices[arista.fin].etiqueta + ": " + arista.peso + " (Ubicación: desde (" + vertices[arista.inicio].x + ", " + vertices[arista.inicio].y + ") hasta (" + vertices[arista.fin].x + ", " + vertices[arista.fin].y + "))\n";
+            });
+
+            // Crear un objeto Blob con el contenido en formato TXT
+            var blob = new Blob([contenido], { type: "text/plain;charset=utf-8" });
+
+            // Crear un elemento <a> para descargar el archivo
+            var enlaceDescarga = document.createElement("a");
+            enlaceDescarga.href = window.URL.createObjectURL(blob);
+            enlaceDescarga.download = "grafo.txt";
+
+            // Ocultar el enlace y hacer clic en él para iniciar la descarga
+            enlaceDescarga.style.display = "none";
+            document.body.appendChild(enlaceDescarga);
+            enlaceDescarga.click();
+            document.body.removeChild(enlaceDescarga);
+        }
+
+        function cargarGrafoDesdeArchivo() {
+            var inputArchivo = document.getElementById('inputArchivo');
+
+            // Verificar si se ha seleccionado un archivo
+            if (inputArchivo.files.length === 0) {
+                swal.fire({
+                    title: 'Error',
+                    text: 'Por favor, selecciona un archivo.',
+                    icon: 'error'
+                });
+                return;
+            }
+
+            var archivo = inputArchivo.files[0];
+            var lector = new FileReader();
+
+            lector.onload = function (evento) {
+                var contenido = evento.target.result;
+                dibujarGrafoDesdeContenido(contenido);
+
+                console.log(contenido);
+
+            };
+
+            lector.readAsText(archivo);
+        }
+
+        function dibujarGrafoDesdeContenido(contenido) {
+            // Limpiar el canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Extraer nodos y aristas del contenido
+            var nodosInicio = contenido.indexOf("Nodos:") + "Nodos:".length;
+            var nodosFin = contenido.indexOf("Aristas:");
+            var nodosTexto = contenido.substring(nodosInicio, nodosFin).trim().split("\n");
+
+            var nodos = {};
+            nodosTexto.forEach(function (nodoTexto) {
+                var partes = nodoTexto.split(":");
+                var etiqueta = partes[0].trim();
+                var coords = partes[1].trim().substring(1, partes[1].length - 1).split(",");
+                var x = parseFloat(coords[0].trim());
+                var y = parseFloat(coords[1].trim());
+                nodos[etiqueta] = { x: x, y: y };
+            });
+
+            var aristasInicio = contenido.indexOf("Aristas:") + "Aristas:".length;
+            var aristasTexto = contenido.substring(aristasInicio).trim().split("\n");
+
+            // Dibujar nodos
+            for (var etiqueta in nodos) {
+                var nodo = nodos[etiqueta];
+                dibujarNodo(nodo.x, nodo.y, etiqueta);
+            }
+
+            // Dibujar aristas
+            aristasTexto.forEach(function (aristaTexto) {
+                var partes = aristaTexto.split(":");
+                var nodosPartes = partes[0].trim().split("->");
+                var nodoInicio = nodosPartes[0].trim();
+                var nodoFin = nodosPartes[1].trim();
+
+                var peso = parseFloat(partes[1].match(/\d+/)[0].trim());
+
+                var ubicacionInicio = partes[2].trim().match(/\(.*?\)/g)[0];
+                var ubicacionFin = partes[2].trim().match(/\(.*?\)/g)[1];
+
+                var coordsInicio = ubicacionInicio.substring(1, ubicacionInicio.length - 1).split(",");
+                var coordsFin = ubicacionFin.substring(1, ubicacionFin.length - 1).split(",");
+
+                var xInicio = parseFloat(coordsInicio[0].trim());
+                var yInicio = parseFloat(coordsInicio[1].trim());
+
+                var xFin = parseFloat(coordsFin[0].trim());
+                var yFin = parseFloat(coordsFin[1].trim());
+
+                ctx.beginPath();
+                ctx.moveTo(xInicio, yInicio);
+                ctx.lineTo(xFin, yFin);
+                ctx.stroke();
+                ctx.fillText(peso, (xInicio + xFin) / 2, (yInicio + yFin) / 2);
+            });
+            grafoCargado = true;
+
+        }
+
+        canvas.addEventListener("click", function (evento) {
+            if (agregandoArista) {
+                var rect = canvas.getBoundingClientRect();
+                var x = evento.clientX - rect.left;
+                var y = evento.clientY - rect.top;
+                for (var i = 0; i < vertices.length; i++) {
+                    var dx = x - vertices[i].x;
+                    var dy = y - vertices[i].y;
+                    if (dx * dx + dy * dy < 400) {
+                        if (nodoSeleccionado === null) {
+                            nodoSeleccionado = i;  
+                            swal.fire({
+                                title: 'Agregar Arista',
+                                text: 'Nodo seleccionado: ' + vertices[i].etiqueta + '. Haz clic en el segundo nodo.',
+                                icon: 'info'
+                            });
+                        } else {
+                            agregarArista(nodoSeleccionado, i);
+                            nodoSeleccionado = null;
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+
+        function redraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < aristas.length; i++) {
+                var arista = aristas[i];
+                dibujarArista(arista.inicio, arista.fin, arista.peso);
+            }
+            for (var i = 0; i < vertices.length; i++) {
+                var vertice = vertices[i];
+                dibujarNodo(vertice.x, vertice.y, vertice.etiqueta);
+            }
+        }
+    </script>
+</body>
+
+</html>
